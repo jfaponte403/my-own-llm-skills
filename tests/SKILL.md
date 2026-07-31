@@ -1,5 +1,5 @@
 ---
-name: write-tests
+name: Tests
 description: >
   This guide will help you write tests correctly. This skill could be actived when ask to "write tests" or "run tests" or "add testings" or when a new code block is created.
 ---
