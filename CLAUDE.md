@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-This is **not an application** — it is the source of truth for Jhonattan's personal [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills). Every top-level folder (`models/`, `repository/`, `tests/`, `lambdas/`) is one skill, meant to be copied or symlinked into `~/.claude/skills/` (global) or `.claude/skills/` (per project).
+This is **not an application** — it is the source of truth for Jhonattan's personal [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills). Every top-level folder (`models/`, `repository/`, `http/`, `lambdas/`, `tests/`) is one skill, meant to be copied or symlinked into `~/.claude/skills/` (global) or `.claude/skills/` (per project).
 
 Two consequences that shape every change here:
 
-- **The Python files are documentation, not a library.** `template.py` is a starter file an LLM will copy into a real project. It has no imports across folders, no packaging, no `__init__.py`. Illustrative entities (`Customer`, `Product`) exist to show the *pattern* — a consumer replaces the fields.
-- **The skills are designed to compose.** `models` defines the entities → `repository` stores and returns those models → `lambdas` validates input with those models and returns them → `tests` verifies the resulting endpoints. When editing one skill, check whether the change breaks the seam with the others (e.g. renaming `XxxModel` in `models/template.py` means `repository/template.py` and its `BaseRepository[T]` docs go stale).
+- **The Python files are documentation, not a library.** `template.py` is a starter file an LLM will copy into a real project. No packaging, no `__init__.py`, and no imports between skill folders — where a template needs another skill's code it either restates the minimum inline (`repository/template.py` redeclares slim models) or imports the path the *consumer project* will have (`lambdas/template.py` imports `core.http_validator`). Illustrative entities (`Customer`, `Product`) exist to show the *pattern* — a consumer replaces the fields.
+- **The skills are designed to compose.** `models` defines the entities → `repository` stores and returns those models → `http` validates input at the boundary and shapes every response → `lambdas` wires one endpoint on top of both → `tests` verifies the resulting endpoints. When editing one skill, check whether the change breaks the seam with the others (e.g. renaming `XxxModel` in `models/template.py` means `repository/template.py` and its `BaseRepository[T]` docs go stale; renaming anything in `http/template.py` breaks the import block at the top of `lambdas/template.py`).
 
 ## Skill anatomy
 
@@ -54,13 +54,19 @@ python -c "import importlib.util,sys; s=importlib.util.spec_from_file_location('
 
 Do this after any edit to a `template.py`. `models/template.py` and `repository/template.py` fail without `email-validator`; that is an environment gap, not a template bug.
 
-The `venv/` in this repo is Python 3.14. `lambdas/template.py` relies on PEP 649 lazy annotations (`HttpError` is annotated with `ResponseStatus`, which is defined further down the file) — it imports on 3.14 but would raise `NameError` on older interpreters. Keep forward references in mind when reordering banner sections.
+**`lambdas/template.py` is the one exception — it does not import standalone, by design.** It imports `core.context`, `core.http_validator` and `models.responses.http_response`, which exist in the consumer's project (they come from the `http` skill), not here. Check it with a syntax pass instead:
+
+```powershell
+python -m py_compile lambdas/template.py
+```
+
+Keep forward references in mind when reordering banner sections. `http/template.py` deliberately declares `models/responses/http_response.py` *before* `core/exceptions.py`, because `HttpError` annotates `ResponseStatus`. In the other order the file only imports on Python 3.14 (via PEP 649 lazy annotations) and raises `NameError` on older interpreters — the `venv/` here is 3.14, so that regression would pass locally and break for a consumer.
 
 ## Coding style the templates must teach
 
 The templates exist to make an LLM write code the way Jhonattan writes it. Reproduce these in every template, and apply them when writing Python anywhere in this repo:
 
-- **Modern type syntax only.** `str | None`, `list[T]`, `dict[str, Any]`, `type[T]` — never `Optional[...]`, `List[...]`, `Dict[...]`. (`lambdas/template.py` still uses `Optional`; that is legacy, not the target.) Annotate everything, including `-> None` on `__init__`.
+- **Modern type syntax only.** `str | None`, `list[T]`, `dict[str, Any]`, `type[T]` — never `Optional[...]`, `List[...]`, `Dict[...]`. Annotate everything, including `-> None` on `__init__`.
 - **Pydantic v2 API.** `model_validate`, `model_dump`, `model_dump_json`, `model_config = ConfigDict(...)`. Never v1 (`parse_obj`, `.dict()`, inner `class Config`).
 - **Rich types over primitives.** `EmailStr` over `str`; `Field(gt=0, min_length=1)` over a bare annotation.
 - **`str, Enum` for fixed value sets** — stays JSON-serializable and readable in the DB.
@@ -76,4 +82,6 @@ The templates exist to make an LLM write code the way Jhonattan writes it. Repro
 2. Add a row to the table in `README.md`. That table's cell is a dense one-paragraph summary of the skill's rules plus its trigger phrases — it is the repo's index, so a new skill isn't done until it is listed there.
 3. If the skill touches Pydantic, verify the template imports (above).
 
-`lambdas/` is currently a work in progress: it has a `template.py` (a Lambda + API Gateway pattern — `http_validator` decorator, `RequestContext`, `HttpError` hierarchy, `HttpResponse.to_lambda`) but no `SKILL.md` and no `README.md` row yet.
+Prefer splitting a skill over letting its `template.py` grow. A template that mixes write-once infrastructure with the pattern a consumer repeats every time is really two skills: that is why the Lambda + API Gateway pattern is `http` (the boundary — `http_validator`, `RequestContext`, `HttpError`, `HttpResponse`) plus `lambdas` (one endpoint on top of it). Roughly, if a section would be copied once per *project* rather than once per *entity or endpoint*, it belongs in its own skill.
+
+`repository/reference.md` is an empty stub, but the `repository` row in `README.md` already advertises a `reference.md` cheat sheet — either fill it or drop the claim.
