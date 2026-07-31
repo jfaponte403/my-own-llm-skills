@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-This is **not an application** — it is the source of truth for Jhonattan's personal [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills). Every top-level folder (`models/`, `repository/`, `http/`, `lambdas/`, `tests/`) is one skill, meant to be copied or symlinked into `~/.claude/skills/` (global) or `.claude/skills/` (per project).
+This is **not an application** — it is the source of truth for Jhonattan's personal [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills). Every top-level folder (`models/`, `repository/`, `services/`, `http/`, `lambdas/`, `tests/`) is one skill, meant to be copied or symlinked into `~/.claude/skills/` (global) or `.claude/skills/` (per project).
 
 Two consequences that shape every change here:
 
-- **The Python files are documentation, not a library.** `template.py` is a starter file an LLM will copy into a real project. No packaging, no `__init__.py`, and no imports between skill folders — where a template needs another skill's code it either restates the minimum inline (`repository/template.py` redeclares slim models) or imports the path the *consumer project* will have (`lambdas/template.py` imports `core.http_validator`). Illustrative entities (`Customer`, `Product`) exist to show the *pattern* — a consumer replaces the fields.
-- **The skills are designed to compose.** `models` defines the entities → `repository` stores and returns those models → `http` validates input at the boundary and shapes every response → `lambdas` wires one endpoint on top of both → `tests` verifies the resulting endpoints. When editing one skill, check whether the change breaks the seam with the others (e.g. renaming `XxxModel` in `models/template.py` means `repository/template.py` and its `BaseRepository[T]` docs go stale; renaming anything in `http/template.py` breaks the import block at the top of `lambdas/template.py`).
+- **The template files are documentation, not a library.** `template.py` (and `template.ts` in `services/`) is a starter file an LLM will copy into a real project. No packaging, no `__init__.py`, and no imports between skill folders — where a template needs another skill's code it either restates the minimum inline (`repository/template.py` redeclares slim models) or imports the path the *consumer project* will have (`lambdas/template.py` imports `core.http_validator`, `services/template.ts` imports `./apiClient`). Illustrative entities (`Customer`, `Product`) exist to show the *pattern* — a consumer replaces the fields.
+- **The skills are designed to compose.** `models` defines the entities → `repository` stores and returns those models → `services` does the work on top of them → `http` validates input at the boundary and shapes every response → `lambdas` wires one endpoint on top of all three → `tests` verifies the resulting endpoints. `services` also extends past the backend: its frontend half consumes the very API `lambdas` exposes. When editing one skill, check whether the change breaks the seam with the others (e.g. renaming `XxxModel` in `models/template.py` means `repository/template.py` and its `BaseRepository[T]` docs go stale; renaming anything in `http/template.py` breaks the import block at the top of `lambdas/template.py`).
 
 ## Skill anatomy
 
@@ -18,7 +18,7 @@ Each skill folder follows the same three-file shape. Match it exactly when addin
 | File | Required | Contents |
 |------|----------|----------|
 | `SKILL.md` | yes | YAML frontmatter (`name`, `description`) + `# <Doing the thing>` + `## Rules` + `## File layout` |
-| `template.py` | yes | One flattened, runnable file showing the whole pattern |
+| `template.py` | yes | One flattened, runnable file showing the whole pattern. A skill that spans two languages ships one template per language instead (`services/` has `template.ts` + `template.py`), each showing the same pattern in its own idiom |
 | `reference.md` | optional | Cheat sheet: library table, ❌ what-not-to-do list, links |
 
 **Frontmatter conventions:**
@@ -38,14 +38,14 @@ Each skill folder follows the same three-file shape. Match it exactly when addin
 # ═════════════════════════════════════════════════════════════
 ```
 
-Either banner style is fine (`---` in `models`/`repository`, `═` in `lambdas`); be consistent *within* a file. The banner path must match the `## File layout` block in that skill's `SKILL.md`.
+Either banner style is fine (`---` in `models`/`repository`, `═` in `lambdas`); be consistent *within* a file. The same applies outside Python — `services/template.ts` uses the `═` banner in `//` comments. The banner path must match the `## File layout` block in that skill's `SKILL.md`.
 
 ## Verifying a change
 
 There is no build, no lint config, and no test suite for this repo — the templates themselves are the artifact. Verification is: **the template must import cleanly under real Pydantic.**
 
 ```powershell
-pip install -r requirements.txt          # pydantic only
+pip install -r requirements.txt          # pydantic + the SDKs services/template.py calls
 pip install "pydantic[email]"            # needed for EmailStr in models/ and repository/
 
 # Import a template to check it (from the repo root)
