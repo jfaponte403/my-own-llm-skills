@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Optional, List, Dict, Any
+from typing import Generic, TypeVar, Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -40,19 +40,19 @@ T = TypeVar("T", bound=BaseModel)
 # Storage adapter interface (swap DynamoDB, SQL, in-memory, etc.)
 class StorageAdapter(ABC):
     @abstractmethod
-    def insert(self, table: str, item: Dict[str, Any]) -> Dict[str, Any]: ...
+    def insert(self, table: str, item: dict[str, Any]) -> dict[str, Any]: ...
 
     @abstractmethod
-    def get(self, table: str, id_: str) -> Optional[Dict[str, Any]]: ...
+    def get(self, table: str, id_: str) -> dict[str, Any] | None: ...
 
     @abstractmethod
-    def update(self, table: str, id_: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]: ...
+    def update(self, table: str, id_: str, data: dict[str, Any]) -> dict[str, Any] | None: ...
 
     @abstractmethod
     def delete(self, table: str, id_: str) -> bool: ...
 
     @abstractmethod
-    def list(self, table: str) -> List[Dict[str, Any]]: ...
+    def list(self, table: str) -> list[dict[str, Any]]: ...
 
 
 # Generic base repository — shared by all repositories.
@@ -65,18 +65,18 @@ class BaseRepository(Generic[T]):
     def create(self, item: T) -> T:
         return self.model.model_validate(self.adapter.insert(self.table, item.model_dump()))
 
-    def get(self, id_: str) -> Optional[T]:
+    def get(self, id_: str) -> T | None:
         raw = self.adapter.get(self.table, id_)
         return self.model.model_validate(raw) if raw else None
 
-    def update(self, id_: str, data: Dict[str, Any]) -> Optional[T]:
+    def update(self, id_: str, data: dict[str, Any]) -> T | None:
         raw = self.adapter.update(self.table, id_, data)
         return self.model.model_validate(raw) if raw else None
 
     def delete(self, id_: str) -> bool:
         return self.adapter.delete(self.table, id_)
 
-    def list(self) -> List[T]:
+    def list(self) -> list[T]:
         return [self.model.model_validate(raw) for raw in self.adapter.list(self.table)]
 
 

@@ -12,6 +12,8 @@ description: >
 
 Follow these rules whenever you create a Pydantic model, using `template.py` as the base. Assume Pydantic v2.
 
+`template.py` shows a `Customer` with `name`, `age`, `email`, `password_hash`, `status` — those fields are **illustrative, not required**. What you copy is the pattern: one model per role, secrets absent from the response, enums for fixed value sets. The actual fields come from the entity you're modeling, and only exist if the domain needs them (an entity without a password has no `password_hash`; one without a fixed lifecycle has no status enum).
+
 ## Rules
 
 1. **Separate models by role.** Never reuse one model everywhere:
