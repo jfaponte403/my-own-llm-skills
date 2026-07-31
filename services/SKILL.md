@@ -80,15 +80,23 @@ const ProductList = () => {
 };
 ```
 
-✅ **Good** — the service owns the call and the shape, the component owns the render:
+✅ **Good** — the service owns the call and the shape, the hook owns the state, the component owns the render:
 
 ```tsx
-const ProductList = () => {
+// hooks/useProducts.ts — from the `hooks` skill
+export function useProducts() {
   const [products, setProducts] = useState<IProduct[]>([]);
 
   useEffect(() => {
     ProductService.list().then(setProducts);
   }, []);
+
+  return { products };
+}
+
+// components/products/ProductList.tsx — from the `components` skill
+const ProductList = () => {
+  const { products } = useProducts();
 
   return (
     <ul>
@@ -103,3 +111,5 @@ const ProductList = () => {
 ```
 
 The bad version spreads the API's `product_id`/`price` naming across every component that renders a product, formats the price differently in each one, hard-codes the auth header next to the JSX, and swallows the failure into an empty list so nobody can tell "no products" from "the request died". The good version cannot: the component only ever sees `IProduct`, and renaming a field in the API is one edit in the mapper.
+
+Where the state and the failure go from there is the `hooks` skill's job — the hook above is trimmed to the seam, and a real one also returns `isLoading` and `error`.
